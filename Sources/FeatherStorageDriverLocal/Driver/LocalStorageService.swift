@@ -41,7 +41,11 @@ private extension LocalStorageService {
 extension LocalStorageService: StorageService {
 
     public var availableSpace: UInt64 {
-        .max
+        let attributes = try? FileManager.default.attributesOfFileSystem(
+            forPath: NSHomeDirectory() as String
+        )
+        let freeSpace = (attributes?[.systemFreeSize] as? NSNumber)?.int64Value
+        return UInt64(freeSpace ?? 0)
     }
 
     public func upload(
@@ -60,13 +64,13 @@ extension LocalStorageService: StorageService {
             path: fileUrl.path,
             mode: .write,
             flags: .allowFileCreation(),
-            eventLoop: self.eventLoopGroup.any()
+            eventLoop: self.eventLoopGroup.next()
         )
         do {
             try await fileio.write(
                 fileHandle: handle,
                 buffer: buffer,
-                eventLoop: self.eventLoopGroup.any()
+                eventLoop: self.eventLoopGroup.next()
             )
             try handle.close()
         }
@@ -78,7 +82,7 @@ extension LocalStorageService: StorageService {
 
     public func download(
         key: String,
-        range: ClosedRange<UInt>?
+        range: ClosedRange<Int>?
     ) async throws -> ByteBuffer {
         let exists = await exists(key: key)
         guard exists else {
@@ -89,19 +93,32 @@ extension LocalStorageService: StorageService {
         let handle = try await fileio.openFile(
             path: sourceUrl.path,
             mode: .read,
-            eventLoop: self.eventLoopGroup.any()
+            eventLoop: self.eventLoopGroup.next()
         )
         do {
             let size = try await fileio.readFileSize(
                 fileHandle: handle,
-                eventLoop: self.eventLoopGroup.any()
+                eventLoop: self.eventLoopGroup.next()
             )
+            if let range, range.lowerBound >= 0, range.upperBound < size {
+                let buffer = try await fileio.read(
+                    fileRegion: .init(
+                        fileHandle: handle,
+                        readerIndex: range.lowerBound,
+                        endIndex: range.upperBound + 1
+                    ),
+                    allocator: .init(),
+                    eventLoop: self.eventLoopGroup.next()
+                )
+                try handle.close()
+                return buffer
+            }
 
             let buffer = try await fileio.read(
                 fileHandle: handle,
                 byteCount: Int(size),
                 allocator: .init(),
-                eventLoop: self.eventLoopGroup.any()
+                eventLoop: self.eventLoopGroup.next()
             )
             try handle.close()
             return buffer
@@ -117,7 +134,33 @@ extension LocalStorageService: StorageService {
     }
 
     public func size(key: String) async -> UInt64 {
-        0
+        let exists = await exists(key: key)
+        guard exists else {
+            return 0
+        }
+        let sourceUrl = url(for: key)
+        let fileio = NonBlockingFileIO(threadPool: self.threadPool)
+        guard
+            let handle = try? await fileio.openFile(
+                path: sourceUrl.path,
+                mode: .read,
+                eventLoop: self.eventLoopGroup.next()
+            )
+        else {
+            return 0
+        }
+        do {
+            let size = try await fileio.readFileSize(
+                fileHandle: handle,
+                eventLoop: self.eventLoopGroup.next()
+            )
+            try? handle.close()
+            return .init(size)
+        }
+        catch {
+            try? handle.close()
+            return 0
+        }
     }
 
     public func copy(
@@ -166,7 +209,10 @@ extension LocalStorageService: StorageService {
     public func createMultipartId(
         key: String
     ) async throws -> String {
-        ""
+        let multipartId = UUID().uuidString
+        let multipartKey = "multipart/\(key)/\(multipartId)"
+        try await create(key: multipartKey)
+        return multipartId
     }
 
     public func upload(
@@ -174,330 +220,51 @@ extension LocalStorageService: StorageService {
         key: String,
         number: Int,
         buffer: ByteBuffer
-    ) async throws -> Multipart.Chunk {
-        .init(chunkId: "", number: 0)
+    ) async throws -> StorageChunk {
+        let chunkId = UUID().uuidString
+        let multipartKey = "multipart/\(key)/\(multipartId)"
+        let chunkKey = "\(multipartKey)/\(chunkId)-\(number)"
+        try await upload(key: chunkKey, buffer: buffer)
+        return .init(chunkId: chunkId, number: number)
     }
 
     public func abort(
         multipartId: String,
         key: String
     ) async throws {
-
+        let multipartKey = "multipart/\(key)/\(multipartId)"
+        try await delete(key: multipartKey)
     }
 
     public func finish(
         multipartId: String,
         key: String,
-        chunks: [Multipart.Chunk]
+        chunks: [StorageChunk]
     ) async throws {
+        let multipartKey = "multipart/\(key)/\(multipartId)"
+        let fileUrl = url(for: key)
+        FileManager.default.createFile(
+            atPath: fileUrl.path,
+            contents: nil
+        )
+        guard let writeHandle = FileHandle(forWritingAtPath: fileUrl.path) else {
+            throw StorageServiceError.invalidKey
+        }
+        
+        for chunk in chunks.sorted(by: { $0.number < $1.number }) {
+            let chunkKey = "\(multipartKey)/\(chunk.chunkId)-\(chunk.number)"
+            let chunkUrl = url(for: chunkKey)
 
+            guard let readHandle = FileHandle(forReadingAtPath: chunkUrl.path) else {
+                throw StorageServiceError.invalidKey
+            }
+            let chunkSize = try FileManager.default.size(at: chunkUrl)
+            let data = readHandle.readData(ofLength: Int(chunkSize))
+            writeHandle.write(data)
+            try readHandle.close()
+        }
+        try writeHandle.close()
+        try await delete(key: multipartKey)
     }
 
-    //    func getAvailableSpace() -> UInt64 {
-    //        let attributes = try? FileManager.default.attributesOfFileSystem(
-    //            forPath: NSHomeDirectory() as String
-    //        )
-    //        let freeSpace = (attributes?[.systemFreeSize] as? NSNumber)?.int64Value
-    //        return UInt64(freeSpace ?? 0)
-    //    }
-    //
-    //    func resolve(
-    //        key: String
-    //    ) -> String {
-    //        baseUrl.appendingPathComponent(key).absoluteString
-    //    }
-    //
-    //    func download(
-    //        key: String,
-    //        range: ClosedRange<UInt>?,
-    //        timeout: TimeAmount
-    //    ) async throws -> ByteBuffer {
-    //        let sourceUrl = basePath.appendingPathComponent(key)
-    //        guard let handle = FileHandle(forReadingAtPath: sourceUrl.path) else {
-    //            throw StorageServiceError.invalidKey
-    //        }
-    //        let attr = try FileManager.default.attributesOfItem(atPath: sourceUrl.path)
-    //        let fileSize = attr[FileAttributeKey.size] as! UInt64
-    //
-    //        guard let range, range.upperBound <= fileSize else {
-    //            return .init(data: handle.readData(ofLength: Int(fileSize)))
-    //        }
-    //        let size = Int(range.upperBound - range.lowerBound)
-    //        try handle.seek(toOffset: UInt64(range.lowerBound))
-    //        return .init(data: handle.readData(ofLength: size))
-    //    }
-    //
-    //    func download(
-    //        key: String,
-    //        chunkSize: UInt,
-    //        timeout: TimeAmount
-    //    ) -> AsyncThrowingStream<ByteBuffer, Error> {
-    //        .init { c in
-    //            Task {
-    //                let sourceUrl = basePath.appendingPathComponent(key)
-    //                guard let handle = FileHandle(forReadingAtPath: sourceUrl.path) else {
-    //                    throw StorageServiceError.invalidKey
-    //                }
-    //                let attr = try FileManager.default.attributesOfItem(atPath: sourceUrl.path)
-    //                let fileSize = attr[FileAttributeKey.size] as! UInt64
-    //                let bufSize = UInt64(chunkSize)
-    //                var num = fileSize / bufSize
-    //                let rem = fileSize % bufSize
-    //                if rem > 0 {
-    //                    num += 1
-    //                }
-    //
-    //                for i in 0..<num {
-    //                    let data: Data
-    //                    try handle.seek(toOffset: bufSize * i)
-    //                    if i == num - 1 {
-    //                        data = handle.readData(ofLength: Int(rem))
-    //                    }
-    //                    else {
-    //                        data = handle.readData(ofLength: Int(bufSize))
-    //                    }
-    //                    c.yield(.init(data: data))
-    //                }
-    //                c.finish()
-    //            }
-    //        }
-    //    }
-    //
-    //    func upload(
-    //        key: String,
-    //        buffer: ByteBuffer,
-    //        checksum: String?,
-    //        timeout: TimeAmount
-    //    ) async throws {
-    //        let fileUrl = basePath.appendingPathComponent(key)
-    //        let location = fileUrl.deletingLastPathComponent()
-    //        try createDir(at: location)
-    //
-    //        if let checksum {
-    //            let calculator = createChecksumCalculator()
-    //            if let data = buffer.getData(at: 0, length: buffer.readableBytes) {
-    //                calculator.update(.init(data))
-    //            }
-    //            if checksum != calculator.finalize() {
-    //                throw StorageServiceError.invalidChecksum
-    //            }
-    //        }
-    //
-    //        return try await fileio.openFile(
-    //            path: fileUrl.path,
-    //            mode: .write,
-    //            flags: .allowFileCreation(posixMode: posixMode),
-    //            eventLoop: context.eventLoop
-    //        )
-    //        .flatMap { handle in
-    //            fileio.write(
-    //                fileHandle: handle,
-    //                buffer: buffer,
-    //                eventLoop: context.eventLoop
-    //            )
-    //            .flatMapThrowing { _ in
-    //                try handle.close()
-    //            }
-    //        }
-    //        .get()
-    //    }
-    //
-    //    func upload<T: AsyncSequence & Sendable>(
-    //        sequence: T,
-    //        size: UInt,
-    //        key: String,
-    //        checksum: String?,
-    //        timeout: TimeAmount
-    //    ) async throws where T.Element == ByteBuffer {
-    //        let sourceUrl = basePath.appendingPathComponent(key)
-    //        FileManager.default.createFile(atPath: sourceUrl.path, contents: nil)
-    //        guard let handle = FileHandle(forWritingAtPath: sourceUrl.path) else {
-    //            throw StorageServiceError.invalidKey
-    //        }
-    //
-    //        var calculator: ChecksumCalculator?
-    //        if checksum != nil {
-    //            calculator = createChecksumCalculator()
-    //        }
-    //        for try await buffer in sequence {
-    //            handle.write(.init(buffer: buffer))
-    //            var buff = buffer
-    //            let bytes = buff.readBytes(length: buff.readableBytes) ?? []
-    //            calculator?.update(bytes)
-    //        }
-    //
-    //        if let checksum, let calculator, checksum != calculator.finalize() {
-    //            throw StorageServiceError.invalidChecksum
-    //        }
-    //
-    //        try handle.close()
-    //    }
-    //
-    //    func create(
-    //        key: String
-    //    ) async throws {
-    //        let dirUrl = basePath.appendingPathComponent(key)
-    //        try createDir(at: dirUrl)
-    //    }
-    //
-    //
-    //    func list(
-    //        key: String?
-    //    ) async throws -> [String] {
-    //        let dirUrl = basePath.appendingPathComponent(key ?? "")
-    //        var isDir: ObjCBool = false
-    //        if FileManager.default.fileExists(atPath: dirUrl.path, isDirectory: &isDir), isDir.boolValue {
-    //            let files = try FileManager.default.contentsOfDirectory(atPath: dirUrl.path)
-    //            return files
-    //        }
-    //        /// it was a file... files don't have children, so we return an empty array.
-    //        return []
-    //    }
-    //
-    //    func copy(
-    //        key source: String,
-    //        to destination: String
-    //    ) async throws {
-    //        let exists = await exists(key: source)
-    //        guard exists else {
-    //            throw StorageServiceError.invalidKey
-    //        }
-    //        try await delete(key: destination)
-    //        let sourceUrl = basePath.appendingPathComponent(source)
-    //        let destinationUrl = basePath.appendingPathComponent(destination)
-    //        let location = destinationUrl.deletingLastPathComponent()
-    //        try createDir(at: location)
-    //        try FileManager.default.copyItem(at: sourceUrl, to: destinationUrl)
-    //    }
-    //
-    //    func move(
-    //        key source: String,
-    //        to destination: String
-    //    ) async throws {
-    //        try await copy(key: source, to: destination)
-    //        try await delete(key: source)
-    //    }
-    //
-    //    func delete(
-    //        key: String
-    //    ) async throws {
-    //        let exists = await exists(key: key)
-    //        guard exists else {
-    //            return
-    //        }
-    //        let fileUrl = basePath.appendingPathComponent(key)
-    //        try FileManager.default.removeItem(atPath: fileUrl.path)
-    //    }
-    //
-    //    func exists(key: String) async -> Bool {
-    //        let fileUrl = basePath.appendingPathComponent(key)
-    //        return FileManager.default.fileExists(atPath: fileUrl.path)
-    //    }
-    //
-    //    func createMultipartUpload(
-    //        key: String
-    //    ) async throws -> MultipartUpload.ID {
-    //        let uploadId = MultipartUpload.ID(UUID().uuidString)
-    //        let multipartDirKey = key + "+multipart/" + uploadId.value
-    //        try await create(key: multipartDirKey)
-    //        return uploadId
-    //    }
-    //
-    //    func uploadMultipartChunk(
-    //        key: String,
-    //        buffer: ByteBuffer,
-    //        uploadId: MultipartUpload.ID,
-    //        partNumber: Int,
-    //        timeout: TimeAmount
-    //    ) async throws -> MultipartUpload.Chunk {
-    //        let multipartDirKey = key + "+multipart/" + uploadId.value
-    //        let fileId = UUID().uuidString
-    //        let fileKey = multipartDirKey + "/" + fileId + "-" + String(partNumber)
-    //        try await upload(
-    //            key: fileKey,
-    //            buffer: buffer,
-    //            checksum: nil,
-    //            timeout: timeout
-    //        )
-    //        return .init(id: fileId, number: partNumber)
-    //    }
-    //
-    //    func uploadMultipartChunk<T: AsyncSequence & Sendable>(
-    //        key: String,
-    //        sequence: T,
-    //        size: UInt,
-    //        uploadId: MultipartUpload.ID,
-    //        partNumber: Int,
-    //        timeout: TimeAmount
-    //    ) async throws -> MultipartUpload.Chunk where T.Element == ByteBuffer {
-    //        let multipartDirKey = key + "+multipart/" + uploadId.value
-    //        let fileId = UUID().uuidString
-    //        let fileKey = multipartDirKey + "/" + fileId + "-" + String(partNumber)
-    //
-    //        let sourceUrl = basePath.appendingPathComponent(fileKey)
-    //
-    //        FileManager.default.createFile(atPath: sourceUrl.path, contents: nil)
-    //        guard let handle = FileHandle(forWritingAtPath: sourceUrl.path) else {
-    //            throw StorageServiceError.invalidKey
-    //        }
-    //
-    //        for try await buffer in sequence {
-    //            handle.write(.init(buffer: buffer))
-    //        }
-    //        try handle.close()
-    //
-    //        return .init(id: fileId, number: partNumber)
-    //    }
-    //
-    //    func cancelMultipartUpload(
-    //        key: String,
-    //        uploadId: MultipartUpload.ID
-    //    ) async throws {
-    //        let multipartBaseKey = key + "+multipart/"
-    //        try await delete(key: multipartBaseKey)
-    //    }
-    //
-    //    func completeMultipartUpload(
-    //        key: String,
-    //        uploadId: MultipartUpload.ID,
-    //        checksum: String?,
-    //        chunks: [MultipartUpload.Chunk],
-    //        timeout: TimeAmount
-    //    ) async throws {
-    //        let multipartBaseKey = key + "+multipart/"
-    //        let multipartDirKey = multipartBaseKey + uploadId.value
-    //
-    //        let outputUrl = basePath.appendingPathComponent(key)
-    //        FileManager.default.createFile(atPath: outputUrl.path, contents: nil)
-    //        guard let writeHandle = FileHandle(forWritingAtPath: outputUrl.path) else {
-    //            throw StorageServiceError.invalidKey
-    //        }
-    //
-    //        var calculator: ChecksumCalculator?
-    //        if checksum != nil {
-    //            calculator = createChecksumCalculator()
-    //        }
-    //        for chunk in chunks {
-    //            let chunkKey = multipartDirKey + "/" + chunk.id + "-" + String(chunk.number)
-    //            let chunkUrl = basePath.appendingPathComponent(chunkKey)
-    //
-    //            guard let readHandle = FileHandle(forReadingAtPath: chunkUrl.path) else {
-    //                throw StorageServiceError.invalidKey
-    //            }
-    //            let attr = try FileManager.default.attributesOfItem(atPath: chunkUrl.path)
-    //            let fileSize = attr[FileAttributeKey.size] as! UInt64
-    //            let data = readHandle.readData(ofLength: Int(fileSize))
-    //            writeHandle.write(data)
-    //            try readHandle.close()
-    //
-    //            calculator?.update([UInt8](data))
-    //        }
-    //        try writeHandle.close()
-    //
-    //        if let checksum, let calculator, checksum != calculator.finalize() {
-    //            throw StorageServiceError.invalidChecksum
-    //        }
-    //
-    //        try await delete(key: multipartBaseKey)
-    //    }
 }

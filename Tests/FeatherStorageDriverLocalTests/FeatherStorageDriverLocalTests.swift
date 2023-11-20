@@ -30,18 +30,16 @@ final class FeatherStorageDriverLocalTests: XCTestCase {
 
             let registry = ServiceRegistry()
             try await registry.add(
-                .localStorage(
+                LocalStorageServiceContext(
                     threadPool: threadPool,
                     eventLoopGroup: eventLoopGroup,
                     path: workUrl.absoluteString
-                ),
-                as: .localStorage
+                )
             )
 
             try await registry.run()
 
-            let storage =
-                try await registry.get(.localStorage) as! StorageService
+            let storage = try await registry.storage()
             let suite = StorageTestSuite(storage)
             do {
                 try await suite.testAll()
