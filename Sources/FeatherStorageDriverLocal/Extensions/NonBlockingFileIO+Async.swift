@@ -10,6 +10,18 @@ import NIOPosix
 
 extension NonBlockingFileIO {
 
+    func read(
+        fileRegion: FileRegion,
+        allocator: ByteBufferAllocator,
+        eventLoop: EventLoop
+    ) async throws -> ByteBuffer {
+        try await read(
+            fileRegion: fileRegion,
+            allocator: allocator,
+            eventLoop: eventLoop
+        ).get()
+    }
+    
     func write(
         fileHandle: NIOFileHandle,
         buffer: ByteBuffer,
