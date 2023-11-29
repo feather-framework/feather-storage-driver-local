@@ -2,7 +2,7 @@
 //  LocalStorageServiceContext.swift
 //  FeatherStorageDriverLocal
 //
-//  Created by Tibor Bodecs on 2020. 04. 28..
+//  Created by Tibor Bödecs on 2020. 04. 28..
 //
 
 import NIO
@@ -30,7 +30,7 @@ public struct LocalStorageServiceContext: ServiceContext {
         self.byteBufferAllocator = byteBufferAllocator
     }
 
-    public func createDriver() throws -> ServiceDriver {
+    public func make() throws -> ServiceBuilder {
         LocalStorageServiceDriver()
     }
 }

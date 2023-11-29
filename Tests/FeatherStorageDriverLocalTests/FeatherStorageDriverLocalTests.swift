@@ -2,7 +2,7 @@
 //  FeatherStorageDriverLocalTests.swift
 //  FeatherStorageDriverLocalTests
 //
-//  Created by Tibor Bodecs on 2023. 01. 16..
+//  Created by Tibor Bödecs on 2023. 01. 16..
 //
 
 import NIO
@@ -29,7 +29,7 @@ final class FeatherStorageDriverLocalTests: XCTestCase {
             .appendingPathComponent(UUID().uuidString)
 
             let registry = ServiceRegistry()
-            try await registry.add(
+            try await registry.addStorage(
                 LocalStorageServiceContext(
                     threadPool: threadPool,
                     eventLoopGroup: eventLoopGroup,

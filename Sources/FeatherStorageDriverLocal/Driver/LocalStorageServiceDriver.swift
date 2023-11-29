@@ -2,14 +2,14 @@
 //  LocalStorageServiceDriver.swift
 //  FeatherStorageDriverLocal
 //
-//  Created by Tibor Bodecs on 2020. 04. 28..
+//  Created by Tibor Bödecs on 2020. 04. 28..
 //
 
 import FeatherService
 
-struct LocalStorageServiceDriver: ServiceDriver {
+struct LocalStorageServiceDriver: ServiceBuilder {
 
-    func run(using config: ServiceConfig) throws -> Service {
+    func build(using config: ServiceConfig) throws -> Service {
         LocalStorageService(config: config)
     }
 }
