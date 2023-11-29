@@ -31,6 +31,6 @@ public struct LocalStorageServiceContext: ServiceContext {
     }
 
     public func make() throws -> ServiceBuilder {
-        LocalStorageServiceDriver()
+        LocalStorageServiceBuilder()
     }
 }
