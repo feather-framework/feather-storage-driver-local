@@ -8,6 +8,7 @@ let package = Package(
         .iOS(.v16),
         .tvOS(.v16),
         .watchOS(.v9),
+        .visionOS(.v1),
     ],
     products: [
         .library(name: "FeatherStorageDriverLocal", targets: ["FeatherStorageDriverLocal"]),
@@ -15,7 +16,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio", from: "2.61.0"),
         .package(url: "https://github.com/feather-framework/feather-storage",
-            .upToNextMinor(from: "0.2.0")
+            .upToNextMinor(from: "0.3.0")
         ),
     ],
     targets: [
