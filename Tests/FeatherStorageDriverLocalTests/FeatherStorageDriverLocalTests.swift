@@ -9,7 +9,7 @@ import NIO
 import Logging
 import Foundation
 import XCTest
-import FeatherService
+import FeatherComponent
 import FeatherStorage
 import FeatherStorageDriverLocal
 import XCTFeatherStorage
@@ -28,9 +28,9 @@ final class FeatherStorageDriverLocalTests: XCTestCase {
             )
             .appendingPathComponent(UUID().uuidString)
 
-            let registry = ServiceRegistry()
+            let registry = ComponentRegistry()
             try await registry.addStorage(
-                LocalStorageServiceContext(
+                LocalStorageComponentContext(
                     threadPool: threadPool,
                     eventLoopGroup: eventLoopGroup,
                     path: workUrl.absoluteString

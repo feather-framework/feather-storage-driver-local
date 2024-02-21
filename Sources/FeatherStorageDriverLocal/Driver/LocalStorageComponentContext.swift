@@ -1,14 +1,14 @@
 //
-//  LocalStorageServiceContext.swift
+//  LocalStorageComponentContext.swift
 //  FeatherStorageDriverLocal
 //
 //  Created by Tibor Bödecs on 2020. 04. 28..
 //
 
 import NIO
-import FeatherService
+import FeatherComponent
 
-public struct LocalStorageServiceContext: ServiceContext {
+public struct LocalStorageComponentContext: ComponentContext {
 
     let threadPool: NIOThreadPool
     let eventLoopGroup: EventLoopGroup
@@ -30,7 +30,7 @@ public struct LocalStorageServiceContext: ServiceContext {
         self.byteBufferAllocator = byteBufferAllocator
     }
 
-    public func make() throws -> ServiceBuilder {
-        LocalStorageServiceBuilder()
+    public func make() throws -> ComponentBuilder {
+        LocalStorageComponentBuilder()
     }
 }
