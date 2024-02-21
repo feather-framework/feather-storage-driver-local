@@ -1,5 +1,5 @@
 //
-//  LocalStorageService.swift
+//  LocalStorageComponent.swift
 //  FeatherStorageDriverLocal
 //
 //  Created by Tibor Bödecs on 2020. 04. 28..
@@ -8,27 +8,27 @@
 import Foundation
 import NIO
 import NIOFoundationCompat
-import FeatherService
+import FeatherComponent
 import FeatherStorage
 
 @dynamicMemberLookup
-struct LocalStorageService {
+struct LocalStorageComponent {
 
-    let config: ServiceConfig
+    let config: ComponentConfig
 
     subscript<T>(
-        dynamicMember keyPath: KeyPath<LocalStorageServiceContext, T>
+        dynamicMember keyPath: KeyPath<LocalStorageComponentContext, T>
     ) -> T {
-        let context = config.context as! LocalStorageServiceContext
+        let context = config.context as! LocalStorageComponentContext
         return context[keyPath: keyPath]
     }
 
-    init(config: ServiceConfig) {
+    init(config: ComponentConfig) {
         self.config = config
     }
 }
 
-private extension LocalStorageService {
+private extension LocalStorageComponent {
 
     func url(for key: String?) -> URL {
         .init(
@@ -38,7 +38,7 @@ private extension LocalStorageService {
     }
 }
 
-extension LocalStorageService: StorageService {
+extension LocalStorageComponent: StorageComponent {
 
     public var availableSpace: UInt64 {
         let attributes = try? FileManager.default.attributesOfFileSystem(
@@ -86,7 +86,7 @@ extension LocalStorageService: StorageService {
     ) async throws -> ByteBuffer {
         let exists = await exists(key: key)
         guard exists else {
-            throw StorageServiceError.invalidKey
+            throw StorageComponentError.invalidKey
         }
         let sourceUrl = url(for: key)
         let fileio = NonBlockingFileIO(threadPool: self.threadPool)
@@ -169,7 +169,7 @@ extension LocalStorageService: StorageService {
     ) async throws {
         let exists = await exists(key: source)
         guard exists else {
-            throw StorageServiceError.invalidKey
+            throw StorageComponentError.invalidKey
         }
         try await delete(key: destination)
         let sourceUrl = url(for: source)
@@ -248,7 +248,7 @@ extension LocalStorageService: StorageService {
             contents: nil
         )
         guard let writeHandle = FileHandle(forWritingAtPath: fileUrl.path) else {
-            throw StorageServiceError.invalidKey
+            throw StorageComponentError.invalidKey
         }
         
         for chunk in chunks.sorted(by: { $0.number < $1.number }) {
@@ -256,7 +256,7 @@ extension LocalStorageService: StorageService {
             let chunkUrl = url(for: chunkKey)
 
             guard let readHandle = FileHandle(forReadingAtPath: chunkUrl.path) else {
-                throw StorageServiceError.invalidKey
+                throw StorageComponentError.invalidKey
             }
             let chunkSize = try FileManager.default.size(at: chunkUrl)
             let data = readHandle.readData(ofLength: Int(chunkSize))
