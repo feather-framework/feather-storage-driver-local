@@ -5,11 +5,11 @@
 //  Created by Tibor Bödecs on 2020. 04. 28..
 //
 
+import FeatherComponent
+import FeatherStorage
 import Foundation
 import NIO
 import NIOFoundationCompat
-import FeatherComponent
-import FeatherStorage
 
 @dynamicMemberLookup
 struct LocalStorageComponent {
@@ -28,9 +28,9 @@ struct LocalStorageComponent {
     }
 }
 
-private extension LocalStorageComponent {
+extension LocalStorageComponent {
 
-    func url(for key: String?) -> URL {
+    fileprivate func url(for key: String?) -> URL {
         .init(
             fileURLWithPath: self.path
         )
