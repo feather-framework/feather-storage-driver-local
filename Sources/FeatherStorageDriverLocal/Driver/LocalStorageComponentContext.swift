@@ -5,8 +5,8 @@
 //  Created by Tibor Bödecs on 2020. 04. 28..
 //
 
-import NIO
 import FeatherComponent
+import NIO
 
 public struct LocalStorageComponentContext: ComponentContext {
 
@@ -15,7 +15,7 @@ public struct LocalStorageComponentContext: ComponentContext {
     let path: String
     let posixMode: mode_t
     let byteBufferAllocator: ByteBufferAllocator
-    
+
     public init(
         threadPool: NIOThreadPool,
         eventLoopGroup: EventLoopGroup,
@@ -30,7 +30,7 @@ public struct LocalStorageComponentContext: ComponentContext {
         self.byteBufferAllocator = byteBufferAllocator
     }
 
-    public func make() throws -> ComponentBuilder {
-        LocalStorageComponentBuilder()
+    public func make() throws -> ComponentFactory {
+        LocalStorageComponentFactory()
     }
 }

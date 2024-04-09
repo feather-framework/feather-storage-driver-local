@@ -19,9 +19,10 @@ extension NonBlockingFileIO {
             fileRegion: fileRegion,
             allocator: allocator,
             eventLoop: eventLoop
-        ).get()
+        )
+        .get()
     }
-    
+
     func write(
         fileHandle: NIOFileHandle,
         buffer: ByteBuffer,

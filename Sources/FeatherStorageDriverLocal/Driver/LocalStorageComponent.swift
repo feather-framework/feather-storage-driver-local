@@ -5,11 +5,11 @@
 //  Created by Tibor Bödecs on 2020. 04. 28..
 //
 
+import FeatherComponent
+import FeatherStorage
 import Foundation
 import NIO
 import NIOFoundationCompat
-import FeatherComponent
-import FeatherStorage
 
 @dynamicMemberLookup
 struct LocalStorageComponent {
@@ -22,15 +22,11 @@ struct LocalStorageComponent {
         let context = config.context as! LocalStorageComponentContext
         return context[keyPath: keyPath]
     }
-
-    init(config: ComponentConfig) {
-        self.config = config
-    }
 }
 
-private extension LocalStorageComponent {
+extension LocalStorageComponent {
 
-    func url(for key: String?) -> URL {
+    fileprivate func url(for key: String?) -> URL {
         .init(
             fileURLWithPath: self.path
         )
@@ -247,15 +243,17 @@ extension LocalStorageComponent: StorageComponent {
             atPath: fileUrl.path,
             contents: nil
         )
-        guard let writeHandle = FileHandle(forWritingAtPath: fileUrl.path) else {
+        guard let writeHandle = FileHandle(forWritingAtPath: fileUrl.path)
+        else {
             throw StorageComponentError.invalidKey
         }
-        
+
         for chunk in chunks.sorted(by: { $0.number < $1.number }) {
             let chunkKey = "\(multipartKey)/\(chunk.chunkId)-\(chunk.number)"
             let chunkUrl = url(for: chunkKey)
 
-            guard let readHandle = FileHandle(forReadingAtPath: chunkUrl.path) else {
+            guard let readHandle = FileHandle(forReadingAtPath: chunkUrl.path)
+            else {
                 throw StorageComponentError.invalidKey
             }
             let chunkSize = try FileManager.default.size(at: chunkUrl)
