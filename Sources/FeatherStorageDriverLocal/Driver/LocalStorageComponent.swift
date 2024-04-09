@@ -247,15 +247,17 @@ extension LocalStorageComponent: StorageComponent {
             atPath: fileUrl.path,
             contents: nil
         )
-        guard let writeHandle = FileHandle(forWritingAtPath: fileUrl.path) else {
+        guard let writeHandle = FileHandle(forWritingAtPath: fileUrl.path)
+        else {
             throw StorageComponentError.invalidKey
         }
-        
+
         for chunk in chunks.sorted(by: { $0.number < $1.number }) {
             let chunkKey = "\(multipartKey)/\(chunk.chunkId)-\(chunk.number)"
             let chunkUrl = url(for: chunkKey)
 
-            guard let readHandle = FileHandle(forReadingAtPath: chunkUrl.path) else {
+            guard let readHandle = FileHandle(forReadingAtPath: chunkUrl.path)
+            else {
                 throw StorageComponentError.invalidKey
             }
             let chunkSize = try FileManager.default.size(at: chunkUrl)

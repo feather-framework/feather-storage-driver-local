@@ -23,10 +23,8 @@ final class FeatherStorageDriverLocalTests: XCTestCase {
         threadPool.start()
 
         do {
-            let workUrl = URL(
-                fileURLWithPath: NSTemporaryDirectory()
-            )
-            .appendingPathComponent(UUID().uuidString)
+            let workUrl = URL(fileURLWithPath: NSTemporaryDirectory())
+                .appendingPathComponent(UUID().uuidString)
 
             let registry = ComponentRegistry()
             try await registry.addStorage(
@@ -37,18 +35,9 @@ final class FeatherStorageDriverLocalTests: XCTestCase {
                 )
             )
 
-            try await registry.run()
-
             let storage = try await registry.storage()
             let suite = StorageTestSuite(storage)
-            do {
-                try await suite.testAll()
-                try await registry.shutdown()
-            }
-            catch {
-                try await registry.shutdown()
-                throw error
-            }
+            try await suite.testAll()
         }
         catch {
             XCTFail("\(error)")
