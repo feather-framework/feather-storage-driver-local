@@ -22,10 +22,6 @@ struct LocalStorageComponent {
         let context = config.context as! LocalStorageComponentContext
         return context[keyPath: keyPath]
     }
-
-    init(config: ComponentConfig) {
-        self.config = config
-    }
 }
 
 extension LocalStorageComponent {
