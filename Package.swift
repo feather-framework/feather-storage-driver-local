@@ -15,13 +15,15 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio", from: "2.61.0"),
-        .package(url: "https://github.com/feather-framework/feather-storage", .upToNextMinor(from: "0.5.0")),
+//        .package(url: "https://github.com/feather-framework/feather-storage", .upToNextMinor(from: "0.5.0")),
+        .package(url: "https://github.com/feather-framework/feather-storage", branch: "feature/async-iterator"),
     ],
     targets: [
         .target(
             name: "FeatherStorageDriverLocal",
             dependencies: [
                 .product(name: "NIO", package: "swift-nio"),
+                .product(name: "_NIOFileSystem", package: "swift-nio"),
                 .product(name: "NIOFoundationCompat", package: "swift-nio"),
                 .product(name: "FeatherStorage", package: "feather-storage"),
             ]
