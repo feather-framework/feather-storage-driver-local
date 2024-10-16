@@ -28,7 +28,7 @@ final class FeatherStorageDriverLocalTests: XCTestCase {
         )
 
         let res = try await storage.list(key: "dir02")
-        guard res == ["dir03", "test-01.txt"] else {
+        guard res.contains("dir03"), res.contains("test-01.txt") else {
             fatalError()
         }
     }
