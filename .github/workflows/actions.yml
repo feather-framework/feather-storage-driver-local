@@ -6,6 +6,18 @@ on:
     - main
 
 jobs:
+
+  soundness_checks:
+    name: tests
+    uses: swiftlang/github-workflows/.github/workflows/soundness.yml@main
+    with:
+      license_header_check_project_name: "name"
+      unacceptable_language_check_enabled : true
+      api_breakage_check_enabled : false
+      docs_check_container_image : false
+      license_header_check_enabled : false
+      broken_symlink_check_enabled : false
+      shell_check_enabled : false
   
   run-checks:
     runs-on: ubuntu-latest
@@ -21,9 +33,6 @@ jobs:
       uses: actions/checkout@v4
       with:
         fetch-depth: 1
-    
-    - name: Check Unacceptable Language
-      uses: feather-actions/check-language@0.0.4
 
     - name: Check Local Swift Dependencies
       uses: feather-actions/check-local-swift-dependencies@0.0.3
