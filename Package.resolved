@@ -14,8 +14,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/feather-framework/feather-storage.git",
       "state" : {
-        "revision" : "a9068a6d34d61d4117615644a7217b6bc308c5b2",
-        "version" : "0.6.0"
+        "revision" : "1b92efe790e3567fc9858dc9d722ef7bcf4bb13d",
+        "version" : "0.6.1"
       }
     },
     {

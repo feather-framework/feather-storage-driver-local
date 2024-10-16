@@ -106,9 +106,6 @@ extension LocalStorageComponent: StorageComponent {
         key: String,
         sequence: StorageAnyAsyncSequence<ByteBuffer>
     ) async throws {
-        //TODO: remove
-        fatalError()
-        
         let fileUrl = url(for: key)
         let location = fileUrl.deletingLastPathComponent()
         try FileManager.default.createDirectory(
@@ -145,9 +142,6 @@ extension LocalStorageComponent: StorageComponent {
     func downloadStream(key: String, range: ClosedRange<Int>?) async throws
         -> StorageAnyAsyncSequence<ByteBuffer>
     {
-        //TODO: remove
-        fatalError()
-
         let exists = await exists(key: key)
         guard exists else {
             throw StorageComponentError.invalidKey
@@ -253,9 +247,6 @@ extension LocalStorageComponent: StorageComponent {
         number: Int,
         sequence: StorageAnyAsyncSequence<ByteBuffer>
     ) async throws -> StorageChunk {
-        //TODO: remove
-        fatalError()
-
         let chunkId = UUID().uuidString
         let multipartKey = "multipart/\(key)/\(multipartId)"
         let chunkKey = "\(multipartKey)/\(chunkId)-\(number)"
@@ -303,120 +294,4 @@ extension LocalStorageComponent: StorageComponent {
         try writeHandle.close()
         try await delete(key: multipartKey)
     }
-
-    public func upload(
-        key: String,
-        buffer: ByteBuffer
-    ) async throws {
-//        try await uploadStream(
-//            key: key,
-//            sequence: .init(
-//                asyncSequence: StorageByteBufferAsyncSequenceWrapper(
-//                    buffer: buffer
-//                ),
-//                length: UInt64(buffer.readableBytes)
-//            )
-//        )
-        let fileUrl = url(for: key)
-        let location = fileUrl.deletingLastPathComponent()
-        try FileManager.default.createDirectory(
-            at: location,
-            permission: self.posixMode
-        )
-
-        let fileio = NonBlockingFileIO(threadPool: self.threadPool)
-        let handle = try await fileio.openFile(
-            path: fileUrl.path,
-            mode: .write,
-            flags: .allowFileCreation(),
-            eventLoop: self.eventLoopGroup.next()
-        )
-        do {
-            try await fileio.write(
-                fileHandle: handle,
-                buffer: buffer,
-                eventLoop: self.eventLoopGroup.next()
-            )
-            try handle.close()
-        }
-        catch {
-            try handle.close()
-            throw error
-        }
-    }
-
-    public func download(
-        key: String,
-        range: ClosedRange<Int>?
-    ) async throws -> ByteBuffer {
-//        try await downloadStream(key: key, range: range).collect(upTo: Int.max)
-        let exists = await exists(key: key)
-                guard exists else {
-                    throw StorageComponentError.invalidKey
-                }
-                let sourceUrl = url(for: key)
-                let fileio = NonBlockingFileIO(threadPool: self.threadPool)
-                let handle = try await fileio.openFile(
-                    path: sourceUrl.path,
-                    mode: .read,
-                    eventLoop: self.eventLoopGroup.next()
-                )
-                do {
-                    let size = try await fileio.readFileSize(
-                        fileHandle: handle,
-                        eventLoop: self.eventLoopGroup.next()
-                    )
-                    if let range, range.lowerBound >= 0, range.upperBound < size {
-                        let buffer = try await fileio.read(
-                            fileRegion: .init(
-                                fileHandle: handle,
-                                readerIndex: range.lowerBound,
-                                endIndex: range.upperBound + 1
-                            ),
-                            allocator: .init(),
-                            eventLoop: self.eventLoopGroup.next()
-                        )
-                        try handle.close()
-                        return buffer
-                    }
-
-                    let buffer = try await fileio.read(
-                        fileHandle: handle,
-                        byteCount: Int(size),
-                        allocator: .init(),
-                        eventLoop: self.eventLoopGroup.next()
-                    )
-                    try handle.close()
-                    return buffer
-                }
-                catch {
-                    try handle.close()
-                    throw error
-                }
-    }
-
-    public func upload(
-        multipartId: String,
-        key: String,
-        number: Int,
-        buffer: ByteBuffer
-    ) async throws -> StorageChunk {
-//        try await uploadStream(
-//            multipartId: multipartId,
-//            key: key,
-//            number: number,
-//            sequence: .init(
-//                asyncSequence: StorageByteBufferAsyncSequenceWrapper(
-//                    buffer: buffer
-//                ),
-//                length: UInt64(buffer.readableBytes)
-//            )
-//        )
-        let chunkId = UUID().uuidString
-        let multipartKey = "multipart/\(key)/\(multipartId)"
-        let chunkKey = "\(multipartKey)/\(chunkId)-\(number)"
-        try await upload(key: chunkKey, buffer: buffer)
-        return .init(chunkId: chunkId, number: number)
-    }
-    
 }
