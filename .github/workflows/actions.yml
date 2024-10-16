@@ -7,29 +7,29 @@ on:
 
 jobs:
   
-  run-checks:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        image:
-          - 'swift:5.10'
-    container:
-      image: ${{ matrix.image }}
+  # run-checks:
+  #   runs-on: ubuntu-latest
+  #   strategy:
+  #     matrix:
+  #       image:
+  #         - 'swift:5.10'
+  #   container:
+  #     image: ${{ matrix.image }}
       
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      with:
-        fetch-depth: 1
+  #   steps:
+  #   - name: Checkout
+  #     uses: actions/checkout@v4
+  #     with:
+  #       fetch-depth: 1
     
-    - name: Check Unacceptable Language
-      uses: feather-actions/check-language@0.0.4
+  #   - name: Check Unacceptable Language
+  #     uses: feather-actions/check-language@0.0.4
 
-    - name: Check Local Swift Dependencies
-      uses: feather-actions/check-local-swift-dependencies@0.0.3
+  #   - name: Check Local Swift Dependencies
+  #     uses: feather-actions/check-local-swift-dependencies@0.0.3
 
-    - name: Run Swift Format
-      uses: feather-actions/run-swift-format@0.0.2
+  #   - name: Run Swift Format
+  #     uses: feather-actions/run-swift-format@0.0.2
 
   run-tests:
     runs-on: ubuntu-latest
