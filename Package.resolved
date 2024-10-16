@@ -14,8 +14,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/feather-framework/feather-storage.git",
       "state" : {
-        "revision" : "c30a691516cf8b2956116f00732b99c639083af8",
-        "version" : "0.5.0"
+        "revision" : "a9068a6d34d61d4117615644a7217b6bc308c5b2",
+        "version" : "0.6.0"
       }
     },
     {
@@ -52,6 +52,15 @@
       "state" : {
         "revision" : "635b2589494c97e48c62514bc8b37ced762e0a62",
         "version" : "2.63.0"
+      }
+    },
+    {
+      "identity" : "swift-plugins",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/BinaryBirds/swift-plugins",
+      "state" : {
+        "revision" : "6ef683f43f732dbc59634f3468ee6521ab23db93",
+        "version" : "0.0.4"
       }
     },
     {
