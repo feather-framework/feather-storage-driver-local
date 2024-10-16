@@ -15,8 +15,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio", from: "2.61.0"),
-//        .package(url: "https://github.com/feather-framework/feather-storage", .upToNextMinor(from: "0.5.0")),
-        .package(url: "https://github.com/feather-framework/feather-storage", branch: "feature/async-iterator"),
+        .package(url: "https://github.com/feather-framework/feather-storage", .upToNextMinor(from: "0.6.0")),
     ],
     targets: [
         .target(
