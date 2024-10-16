@@ -9,6 +9,7 @@ import FeatherComponent
 import FeatherStorage
 import Foundation
 import NIO
+import NIOFileSystem
 import NIOFoundationCompat
 
 @dynamicMemberLookup
@@ -34,6 +35,63 @@ extension LocalStorageComponent {
     }
 }
 
+class FileChunksAsyncSequenceWrapper: AsyncSequence {
+    typealias Element = ByteBuffer
+
+    let handler: ReadFileHandle
+    let fileChunks: FileChunks
+    let length: UInt64
+
+    init(path: String, range: ClosedRange<Int>?) async throws {
+        handler = try await FileSystem.shared.openFile(
+            forReadingAt: .init(path)
+        )
+
+        let size = try await handler.info().size
+
+        if let range, range.lowerBound >= 0, range.upperBound < size {
+            fileChunks = handler.readChunks(
+                in: Int64(range.lowerBound)...Int64(range.upperBound),
+                chunkLength: .kilobytes(32)
+            )
+            length = UInt64(range.upperBound - range.lowerBound + 1)
+        }
+        else {
+            fileChunks = handler.readChunks(
+                in: 0..<size,
+                chunkLength: .kilobytes(32)
+            )
+            length = UInt64(size)
+        }
+    }
+
+    struct AsyncIterator: AsyncIteratorProtocol {
+        var iterator: FileChunks.FileChunkIterator
+
+        mutating func next() async throws -> ByteBuffer? {
+            try await iterator.next()
+        }
+    }
+
+    func makeAsyncIterator() -> AsyncIterator {
+        .init(iterator: fileChunks.makeAsyncIterator())
+    }
+
+    deinit {
+        let semaphore = DispatchSemaphore(value: 0)
+        Task {
+            do {
+                try await handler.close()
+            }
+            catch {
+                //catch all
+            }
+            semaphore.signal()
+        }
+        semaphore.wait()
+    }
+}
+
 extension LocalStorageComponent: StorageComponent {
 
     public var availableSpace: UInt64 {
@@ -44,9 +102,9 @@ extension LocalStorageComponent: StorageComponent {
         return UInt64(freeSpace ?? 0)
     }
 
-    public func upload(
+    public func uploadStream(
         key: String,
-        buffer: ByteBuffer
+        sequence: StorageAnyAsyncSequence<ByteBuffer>
     ) async throws {
         let fileUrl = url(for: key)
         let location = fileUrl.deletingLastPathComponent()
@@ -63,11 +121,16 @@ extension LocalStorageComponent: StorageComponent {
             eventLoop: self.eventLoopGroup.next()
         )
         do {
-            try await fileio.write(
-                fileHandle: handle,
-                buffer: buffer,
-                eventLoop: self.eventLoopGroup.next()
-            )
+            var iterator = sequence.makeAsyncIterator()
+
+            while let byteBuffer = try await iterator.next() {
+                try await fileio.write(
+                    fileHandle: handle,
+                    buffer: byteBuffer,
+                    eventLoop: self.eventLoopGroup.next()
+                )
+            }
+
             try handle.close()
         }
         catch {
@@ -76,53 +139,20 @@ extension LocalStorageComponent: StorageComponent {
         }
     }
 
-    public func download(
-        key: String,
-        range: ClosedRange<Int>?
-    ) async throws -> ByteBuffer {
+    func downloadStream(key: String, range: ClosedRange<Int>?) async throws
+        -> StorageAnyAsyncSequence<ByteBuffer>
+    {
         let exists = await exists(key: key)
         guard exists else {
             throw StorageComponentError.invalidKey
         }
         let sourceUrl = url(for: key)
-        let fileio = NonBlockingFileIO(threadPool: self.threadPool)
-        let handle = try await fileio.openFile(
+        let sequence = try await FileChunksAsyncSequenceWrapper(
             path: sourceUrl.path,
-            mode: .read,
-            eventLoop: self.eventLoopGroup.next()
+            range: range
         )
-        do {
-            let size = try await fileio.readFileSize(
-                fileHandle: handle,
-                eventLoop: self.eventLoopGroup.next()
-            )
-            if let range, range.lowerBound >= 0, range.upperBound < size {
-                let buffer = try await fileio.read(
-                    fileRegion: .init(
-                        fileHandle: handle,
-                        readerIndex: range.lowerBound,
-                        endIndex: range.upperBound + 1
-                    ),
-                    allocator: .init(),
-                    eventLoop: self.eventLoopGroup.next()
-                )
-                try handle.close()
-                return buffer
-            }
 
-            let buffer = try await fileio.read(
-                fileHandle: handle,
-                byteCount: Int(size),
-                allocator: .init(),
-                eventLoop: self.eventLoopGroup.next()
-            )
-            try handle.close()
-            return buffer
-        }
-        catch {
-            try handle.close()
-            throw error
-        }
+        return .init(asyncSequence: sequence, length: sequence.length)
     }
 
     public func exists(key: String) async -> Bool {
@@ -211,16 +241,16 @@ extension LocalStorageComponent: StorageComponent {
         return multipartId
     }
 
-    public func upload(
+    func uploadStream(
         multipartId: String,
         key: String,
         number: Int,
-        buffer: ByteBuffer
+        sequence: StorageAnyAsyncSequence<ByteBuffer>
     ) async throws -> StorageChunk {
         let chunkId = UUID().uuidString
         let multipartKey = "multipart/\(key)/\(multipartId)"
         let chunkKey = "\(multipartKey)/\(chunkId)-\(number)"
-        try await upload(key: chunkKey, buffer: buffer)
+        try await uploadStream(key: chunkKey, sequence: sequence)
         return .init(chunkId: chunkId, number: number)
     }
 
@@ -264,5 +294,4 @@ extension LocalStorageComponent: StorageComponent {
         try writeHandle.close()
         try await delete(key: multipartKey)
     }
-
 }

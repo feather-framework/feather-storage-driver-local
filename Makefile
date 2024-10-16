@@ -1,22 +1,39 @@
 SHELL=/bin/bash
 
-build:
-	swift build
+checks: breakage language symlinks deps lint
 
-release:
-	swift build -c release
+breakage:
+	swift package --disable-sandbox check-api-breakage
+
+symlinks:
+	swift package --disable-sandbox check-broken-symlinks
+
+deps:
+	swift package --disable-sandbox check-local-swift-dependencies
+
+security:
+	swift package --disable-sandbox check-openapi-security
+
+validation:
+	swift package --disable-sandbox check-openapi-validation
+
+language:
+	swift package --disable-sandbox check-unacceptable-language
+
+contributors:
+	swift package --disable-sandbox generate-contributors-list
+
+install-format:
+	swift package --disable-sandbox install-swift-format
+
+run-clean:
+	swift package --disable-sandbox run-clean
 	
-test:
-	swift test --parallel
+chmod:
+	swift package --disable-sandbox run-chmod
 
-test-with-coverage:
-	swift test --parallel --enable-code-coverage
-
-clean:
-	rm -rf .build
-
-check:
-	./scripts/run-checks.sh
+lint:
+	swift package --disable-sandbox run-swift-format
 
 format:
-	./scripts/run-swift-format.sh --fix
+	swift package --disable-sandbox run-swift-format --fix
